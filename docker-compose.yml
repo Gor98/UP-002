@@ -1,0 +1,58 @@
+version: '3.7'
+
+services:
+    api-core-02:
+        container_name: api-core-02
+        build:
+            context: .
+            dockerfile: docker/core/Dockerfile
+        depends_on:
+            - api-db-02
+        env_file:
+            - ./.env
+        expose:
+            - "${PHP_PORT}"
+        volumes:
+            - ./:/var/www
+            - ./docker/core/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - api-02
+
+    api-db-02:
+        image: mysql:5.7
+        container_name: api-db-02
+        environment:
+            - MYSQL_DATABASE=${DB_DATABASE}
+            - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+            - MYSQL_USER=${DB_USERNAME}
+            - MYSQL_PASSWORD=${DB_PASSWORD}
+        volumes:
+            - .db-data:/var/lib/mysql
+            - ./docker/core/mysql/init-mysql.js:/docker-entrypoint-initdb.d/init-mysql-js:ro
+        ports:
+            - "${DB_PORT}:${DB_MYSQL_CONTAINER_PORT}"
+        restart: always
+        networks:
+            - api-02
+
+    api-webserver-02:
+        image: nginx:1.17
+        container_name: api-webserver-02
+        restart: unless-stopped
+        ports:
+            - "${CORE_NGINX_PORT}:${CONTAINER_NGINX_PORT}"
+        volumes:
+            - ./:/var/www
+            - ./docker/core/conf.d:/etc/nginx/conf.d
+        links:
+            - api-core-02
+        depends_on:
+            - api-core-02
+        networks:
+            api-02:
+                aliases:
+                    - api-02.loc
+
+networks:
+    api-02:
+        driver: bridge
